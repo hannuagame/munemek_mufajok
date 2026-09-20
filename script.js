@@ -1,276 +1,331 @@
-const categoriesEl = document.getElementById("categories");
-const gameCategoriesEl = document.getElementById("gameCategories");
-const itemsEl = document.getElementById("items");
-const resultEl = document.getElementById("result");
-const editView = document.getElementById("editView");
-const playView = document.getElementById("playView");
+let games=JSON.parse(localStorage.getItem("categoryGames")||"[]");
+let currentGame=null;
+let checked=false;
+let showingSolution=false;
 
-let categories = [
-  { name: "Állatok", features: ["kutya", "macska", "ló"] },
-  { name: "Járművek", features: ["autó", "repülő", "hajó"] },
-  { name: "Ételek", features: ["pizza", "alma", "leves"] }
-];
-
-let draggedCard = null;
-
-function renderEditor() {
-  categoriesEl.innerHTML = "";
-
-  categories.forEach((category, categoryIndex) => {
-    const box = document.createElement("div");
-    box.className = "category-editor";
-
-    const head = document.createElement("div");
-    head.className = "category-head";
-
-    const name = document.createElement("input");
-    name.value = category.name;
-    name.placeholder = "Kategória neve";
-    name.addEventListener("input", e => category.name = e.target.value);
-
-    const remove = document.createElement("button");
-    remove.className = "remove";
-    remove.textContent = "×";
-    remove.title = "Kategória törlése";
-    remove.onclick = () => {
-      categories.splice(categoryIndex, 1);
-      renderEditor();
-    };
-
-    head.append(name, remove);
-    box.appendChild(head);
-
-    category.features.forEach((feature, featureIndex) => {
-      const row = document.createElement("div");
-      row.className = "feature-row";
-
-      const input = document.createElement("input");
-      input.value = feature;
-      input.placeholder = "Jellemző";
-      input.addEventListener("input", e => category.features[featureIndex] = e.target.value);
-
-      const removeFeature = document.createElement("button");
-      removeFeature.className = "remove";
-      removeFeature.textContent = "×";
-      removeFeature.onclick = () => {
-        category.features.splice(featureIndex, 1);
-        renderEditor();
-      };
-
-      row.append(input, removeFeature);
-      box.appendChild(row);
-    });
-
-    const addFeature = document.createElement("button");
-    addFeature.className = "secondary add-feature";
-    addFeature.textContent = "+ Jellemző";
-    addFeature.onclick = () => {
-      category.features.push("");
-      renderEditor();
-    };
-
-    box.appendChild(addFeature);
-    categoriesEl.appendChild(box);
-  });
+function saveGames(){
+  localStorage.setItem("categoryGames",JSON.stringify(games));
 }
 
-function switchMode(mode) {
-  document.querySelectorAll(".tab").forEach(tab => {
-    tab.classList.toggle("active", tab.dataset.mode === mode);
-  });
-  editView.classList.toggle("hidden", mode !== "edit");
-  playView.classList.toggle("hidden", mode !== "play");
+function showGames(){
+  document.getElementById("content").innerHTML=`
+    <div class="card">
+      <h2>Játékaim</h2>
+      <div class="games">
+        ${games.length?games.map((g,i)=>`
+          <div class="game-row">
+            <strong>${escapeHtml(g.name)}</strong>
+            <div class="game-buttons">
+              <button onclick="startGame(${i})">Játék</button>
+              <button onclick="editGame(${i})">Szerkesztés</button>
+              <button onclick="deleteGame(${i})">Törlés</button>
+            </div>
+          </div>
+        `).join(""):"<p>Még nincs mentett játék.</p>"}
+      </div>
+    </div>
+  `;
 }
 
-function startGame() {
-  const clean = categories
-    .map(c => ({
-      name: c.name.trim(),
-      features: c.features.map(f => f.trim()).filter(Boolean)
-    }))
-    .filter(c => c.name && c.features.length);
+function newGame(){
+  currentGame={
+    name:"",
+    categories:[]
+  };
+  renderEditor();
+}
 
-  if (!clean.length) {
-    alert("Adj meg legalább egy kategóriát és egy jellemzőt.");
+function editGame(i){
+  currentGame=JSON.parse(JSON.stringify(games[i]));
+  currentGame.index=i;
+  renderEditor();
+}
+
+function renderEditor(){
+  document.getElementById("content").innerHTML=`
+    <div class="card">
+      <h2>Játék szerkesztése</h2>
+      <input id="gameName" placeholder="Játék neve" value="${escapeAttr(currentGame.name)}">
+      <div id="categories"></div>
+      <div class="editor-actions">
+        <button onclick="addCategory()">+ Kategória</button>
+        <button onclick="saveGame()">Játék mentése</button>
+        <button onclick="showGames()">Mégse</button>
+      </div>
+    </div>
+  `;
+  renderCategories();
+}
+
+function renderCategories(){
+  const box=document.getElementById("categories");
+  box.innerHTML=currentGame.categories.map((c,i)=>`
+    <div class="category">
+      <input value="${escapeAttr(c.name)}"
+        oninput="currentGame.categories[${i}].name=this.value"
+        placeholder="Kategória neve">
+      <div class="traits-editor">
+        ${c.traits.map((t,j)=>`
+          <div style="display:flex;gap:5px">
+            <input value="${escapeAttr(t)}"
+              oninput="currentGame.categories[${i}].traits[${j}]=this.value"
+              placeholder="Jellemző">
+            <button onclick="removeTrait(${i},${j})">×</button>
+          </div>
+        `).join("")}
+      </div>
+      <div class="editor-actions">
+        <button onclick="addTrait(${i})">+ Jellemző</button>
+        <button onclick="removeCategory(${i})">Kategória törlése</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function addCategory(){
+  currentGame.categories.push({name:"",traits:[""]});
+  renderCategories();
+}
+
+function removeCategory(i){
+  currentGame.categories.splice(i,1);
+  renderCategories();
+}
+
+function addTrait(i){
+  currentGame.categories[i].traits.push("");
+  renderCategories();
+}
+
+function removeTrait(i,j){
+  currentGame.categories[i].traits.splice(j,1);
+  renderCategories();
+}
+
+function saveGame(){
+  currentGame.name=document.getElementById("gameName").value.trim()||"Névtelen játék";
+  currentGame.categories=currentGame.categories.map(c=>({
+    name:c.name.trim(),
+    traits:c.traits.filter(t=>t.trim()).map(t=>t.trim())
+  })).filter(c=>c.name&&c.traits.length);
+
+  if(!currentGame.categories.length){
+    alert("Adj hozzá legalább egy kategóriát és egy jellemzőt!");
     return;
   }
 
-  categories = clean;
-  renderGame();
-  switchMode("play");
-}
-
-function renderGame() {
-  gameCategoriesEl.innerHTML = "";
-  itemsEl.innerHTML = "";
-  resultEl.classList.add("hidden");
-  resultEl.textContent = "";
-
-  categories.forEach((category, categoryIndex) => {
-    const box = document.createElement("div");
-    box.className = "game-category";
-    box.dataset.category = categoryIndex;
-
-    const title = document.createElement("h2");
-    title.textContent = category.name;
-
-    const dropZone = document.createElement("div");
-    dropZone.className = "drop-zone";
-
-    setupDropZone(box, dropZone);
-    box.append(title, dropZone);
-    gameCategoriesEl.appendChild(box);
-  });
-
-  const allFeatures = [];
-  categories.forEach((category, categoryIndex) => {
-    category.features.forEach(feature => {
-      allFeatures.push({ text: feature, answer: categoryIndex });
-    });
-  });
-
-  shuffle(allFeatures).forEach((item, index) => {
-    itemsEl.appendChild(createCard(item, index));
-  });
-
-  setupDropZone(itemsEl, itemsEl);
-}
-
-function createCard(item, index) {
-  const card = document.createElement("div");
-  card.className = "card";
-  card.textContent = item.text;
-  card.draggable = true;
-  card.dataset.answer = item.answer;
-  card.dataset.id = index;
-
-  card.addEventListener("dragstart", () => {
-    draggedCard = card;
-    card.classList.add("dragging");
-  });
-
-  card.addEventListener("dragend", () => {
-    card.classList.remove("dragging");
-    draggedCard = null;
-  });
-
-  let startX, startY, clone, offsetX, offsetY;
-
-  card.addEventListener("pointerdown", e => {
-    if (e.pointerType === "mouse") return;
-    e.preventDefault();
-    draggedCard = card;
-    const rect = card.getBoundingClientRect();
-    offsetX = e.clientX - rect.left;
-    offsetY = e.clientY - rect.top;
-    clone = card.cloneNode(true);
-    clone.style.position = "fixed";
-    clone.style.width = rect.width + "px";
-    clone.style.left = (e.clientX - offsetX) + "px";
-    clone.style.top = (e.clientY - offsetY) + "px";
-    clone.style.zIndex = "1000";
-    clone.style.pointerEvents = "none";
-    clone.classList.add("dragging");
-    document.body.appendChild(clone);
-    card.style.opacity = ".25";
-    card.setPointerCapture(e.pointerId);
-  });
-
-  card.addEventListener("pointermove", e => {
-    if (!clone) return;
-    clone.style.left = (e.clientX - offsetX) + "px";
-    clone.style.top = (e.clientY - offsetY) + "px";
-  });
-
-  card.addEventListener("pointerup", e => {
-    if (!clone) return;
-    const target = document.elementFromPoint(e.clientX, e.clientY);
-    const zone = target?.closest(".game-category, .items");
-    if (zone) {
-      if (zone.classList.contains("items")) {
-        itemsEl.appendChild(card);
-      } else {
-        zone.querySelector(".drop-zone").appendChild(card);
-      }
-    }
-    card.style.opacity = "";
-    clone.remove();
-    clone = null;
-    draggedCard = null;
-  });
-
-  return card;
-}
-
-function setupDropZone(container, visualZone) {
-  container.addEventListener("dragover", e => {
-    e.preventDefault();
-    container.classList.add("over");
-  });
-
-  container.addEventListener("dragleave", () => {
-    container.classList.remove("over");
-  });
-
-  container.addEventListener("drop", e => {
-    e.preventDefault();
-    container.classList.remove("over");
-    if (!draggedCard) return;
-
-    if (container.classList.contains("items")) {
-      itemsEl.appendChild(draggedCard);
-    } else {
-      visualZone.appendChild(draggedCard);
-    }
-  });
-}
-
-function checkAnswers() {
-  let total = 0;
-  let correct = 0;
-
-  document.querySelectorAll(".card").forEach(card => {
-    total++;
-    const parent = card.closest(".game-category");
-    const isCorrect = parent && Number(parent.dataset.category) === Number(card.dataset.answer);
-
-    card.classList.remove("correct", "wrong");
-    card.classList.add(isCorrect ? "correct" : "wrong");
-
-    if (isCorrect) correct++;
-  });
-
-  const placed = [...document.querySelectorAll(".game-category .card")].length;
-  const unanswered = total - placed;
-
-  resultEl.classList.remove("hidden");
-  resultEl.textContent = unanswered
-    ? `${correct} / ${total} helyes. Még ${unanswered} jellemző nincs kategóriába húzva.`
-    : `${correct} / ${total} helyes.`;
-}
-
-function shuffle(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
+  if(currentGame.index!==undefined){
+    games[currentGame.index]=JSON.parse(JSON.stringify(currentGame));
+    delete games[currentGame.index].index;
+  }else{
+    games.push(JSON.parse(JSON.stringify(currentGame)));
   }
-  return array;
+
+  saveGames();
+  showGames();
 }
 
-document.getElementById("addCategory").onclick = () => {
-  categories.push({ name: "", features: [""] });
-  renderEditor();
-};
+function deleteGame(i){
+  if(confirm("Biztosan törlöd ezt a játékot?")){
+    games.splice(i,1);
+    saveGames();
+    showGames();
+  }
+}
 
-document.getElementById("startGame").onclick = startGame;
-document.getElementById("check").onclick = checkAnswers;
-document.getElementById("resetGame").onclick = renderGame;
+function startGame(i){
+  currentGame=JSON.parse(JSON.stringify(games[i]));
+  checked=false;
+  showingSolution=false;
 
-document.querySelectorAll(".tab").forEach(tab => {
-  tab.onclick = () => {
-    if (tab.dataset.mode === "play") startGame();
-    else switchMode("edit");
+  const all=[];
+  currentGame.categories.forEach((c,ci)=>{
+    c.traits.forEach(t=>all.push({
+      text:t,
+      correct:ci
+    }));
+  });
+
+  all.sort(()=>Math.random()-.5);
+  currentGame.items=all;
+  renderGame();
+}
+
+function renderGame(){
+  const categories=currentGame.categories;
+
+  document.getElementById("content").innerHTML=`
+    <div class="card">
+      <h2>${escapeHtml(currentGame.name)}</h2>
+      <div id="gameBoard">
+        ${categories.map((c,i)=>`
+          <div class="play-category" data-category="${i}">
+            <h3>${escapeHtml(c.name)}</h3>
+            <div class="dropzone"
+              ondragover="allowDrop(event)"
+              ondrop="dropTrait(event,${i})">
+            </div>
+          </div>
+        `).join("")}
+      </div>
+
+      <div class="traits" id="traits"></div>
+
+      <div class="controls">
+        <button onclick="checkGame()">ELLENŐRZÉS</button>
+        ${checked?`<button onclick="toggleSolution()">
+          ${showingSolution?"JÁTÉKOS VÁLASZAI":"MEGOLDÁS / HELYES VÁLASZOK"}
+        </button>`:""}
+        <button onclick="showGames()">Játékaim</button>
+      </div>
+
+      <div id="result"></div>
+    </div>
+  `;
+
+  renderTraits();
+}
+
+function renderTraits(){
+  const box=document.getElementById("traits");
+
+  if(showingSolution){
+    box.innerHTML="";
+    currentGame.categories.forEach((c,ci)=>{
+      const category=document.querySelector(`[data-category="${ci}"] .dropzone`);
+      category.innerHTML=c.traits.map(t=>`
+        <div class="trait correct">${escapeHtml(t)}</div>
+      `).join("");
+    });
+    return;
+  }
+
+  const placed=[];
+  document.querySelectorAll(".dropzone .trait").forEach(el=>{
+    placed.push(el.dataset.id);
+  });
+
+  box.innerHTML="";
+
+  currentGame.items.forEach((item,i)=>{
+    if(!placed.includes(String(i))){
+      const div=document.createElement("div");
+      div.className="trait";
+      div.textContent=item.text;
+      div.draggable=true;
+      div.dataset.id=i;
+      div.dataset.correct=item.correct;
+
+      div.ondragstart=e=>{
+        e.dataTransfer.setData("text/plain",i);
+        div.classList.add("dragging");
+      };
+
+      div.ondragend=()=>{
+        div.classList.remove("dragging");
+      };
+
+      box.appendChild(div);
+    }
+  });
+}
+
+function allowDrop(e){
+  e.preventDefault();
+}
+
+function dropTrait(e,categoryIndex){
+  e.preventDefault();
+
+  const id=e.dataTransfer.getData("text/plain");
+  const item=currentGame.items[id];
+
+  if(!item)return;
+
+  const target=e.currentTarget;
+  const div=document.createElement("div");
+
+  div.className="trait";
+  div.textContent=item.text;
+  div.draggable=true;
+  div.dataset.id=id;
+  div.dataset.correct=item.correct;
+
+  div.ondragstart=ev=>{
+    ev.dataTransfer.setData("text/plain",id);
+    div.classList.add("dragging");
   };
-});
 
-renderEditor();
+  div.ondragend=()=>{
+    div.classList.remove("dragging");
+  };
+
+  target.appendChild(div);
+
+  renderTraits();
+}
+
+function checkGame(){
+  checked=true;
+  showingSolution=false;
+
+  let correct=0;
+  let total=currentGame.items.length;
+
+  document.querySelectorAll(".dropzone .trait").forEach(el=>{
+    const category=el.closest(".play-category").dataset.category;
+    const isCorrect=String(category)===el.dataset.correct;
+
+    if(isCorrect){
+      el.classList.add("correct");
+      correct++;
+    }else{
+      el.classList.add("wrong");
+    }
+  });
+
+  document.getElementById("result").innerHTML=
+    `<div class="result">${correct} / ${total} helyes</div>`;
+
+  renderGame();
+  setTimeout(()=>{
+    document.querySelectorAll(".dropzone .trait").forEach(el=>{
+      const category=el.closest(".play-category").dataset.category;
+      if(String(category)===el.dataset.correct)
+        el.classList.add("correct");
+      else
+        el.classList.add("wrong");
+    });
+
+    document.getElementById("result").innerHTML=
+      `<div class="result">${correct} / ${total} helyes</div>`;
+  },0);
+}
+
+function toggleSolution(){
+  showingSolution=!showingSolution;
+  renderGame();
+
+  if(!showingSolution){
+    restorePlayerAnswers();
+  }
+}
+
+function restorePlayerAnswers(){
+  renderGame();
+}
+
+function escapeHtml(s){
+  return String(s)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+function escapeAttr(s){
+  return escapeHtml(s);
+}
+
+showGames();
