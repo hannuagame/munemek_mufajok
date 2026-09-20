@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Kategorizáló játék</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>Kategorizáló játék</h1>
+      <div class="tabs">
+        <button class="tab active" data-mode="edit">Szerkesztés</button>
+        <button class="tab" data-mode="play">Játék</button>
+      </div>
+    </header>
+
+    <section id="editView" class="view">
+      <div id="categories"></div>
+      <button id="addCategory" class="secondary">+ Kategória</button>
+      <div class="edit-actions">
+        <button id="startGame" class="primary">Játék indítása</button>
+      </div>
+    </section>
+
+    <section id="playView" class="view hidden">
+      <div id="gameCategories" class="game-categories"></div>
+      <div id="items" class="items"></div>
+      <div class="play-actions">
+        <button id="check" class="primary">Ellenőrzés</button>
+        <button id="resetGame" class="secondary">Újrakeverés</button>
+      </div>
+      <div id="result" class="result hidden"></div>
+    </section>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
