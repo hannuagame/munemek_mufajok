@@ -1,200 +1,194 @@
-*{box-sizing:border-box}
+let games = JSON.parse(localStorage.getItem("csoportositoGames") || "[]");
 
-body{
-  margin:0;
-  font-family:Arial,sans-serif;
-  background:#f4f6f8;
-  color:#222;
+let currentGame = null;
+let playerAnswers = {};
+let checked = false;
+let showingCorrect = false;
+
+function saveGames(){
+    localStorage.setItem("csoportositoGames", JSON.stringify(games));
 }
 
-#app{
-  max-width:1100px;
-  margin:auto;
-  padding:20px;
+function home(){
+
+    document.getElementById("content").innerHTML = `
+        <div class="top">
+            <div>
+                <h2>Játékaim</h2>
+            </div>
+
+            <div class="new-game">
+                <button onclick="newGame()">＋ Új játék</button>
+                <button onclick="editSelected()">Szerkesztése</button>
+            </div>
+        </div>
+
+        <div class="game-list">
+            ${
+                games.length
+                ? games.map((game,index)=>`
+                    <div class="game-item" onclick="startGame(${index})">
+                        ${escapeHtml(game.name)}
+                    </div>
+                `).join("")
+                : ""
+            }
+        </div>
+    `;
 }
 
-header{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:20px;
-  margin-bottom:25px;
+function newGame(){
+
+    currentGame = {
+        name:"",
+        categories:[]
+    };
+
+    renderEditor();
 }
 
-h1{margin:0}
-
-button{
-  border:0;
-  border-radius:8px;
-  padding:11px 18px;
-  font-size:16px;
-  cursor:pointer;
-  background:#21c9cc;
-  color:white;
+function editSelected(){
+    if(games.length){
+        editGame(0);
+    }
 }
 
-button:hover{opacity:.85}
+function editGame(index){
 
-.nav{
-  display:flex;
-  gap:8px;
+    currentGame = JSON.parse(JSON.stringify(games[index]));
+    currentGame.index = index;
+
+    renderEditor();
 }
 
-.card{
-  background:white;
-  border-radius:12px;
-  padding:20px;
-  margin-bottom:18px;
-  box-shadow:0 2px 8px #0001;
+function renderEditor(){
+
+    document.getElementById("content").innerHTML = `
+
+        <div class="editor">
+
+            <h2>Játék szerkesztése</h2>
+
+            <div class="game-name">
+                <input
+                    id="gameName"
+                    placeholder="Játéknév"
+                    value="${escapeAttr(currentGame.name)}"
+                >
+            </div>
+
+            <div id="editorCategories"></div>
+
+            <button class="add" onclick="addCategory()">
+                ＋ Kategória
+            </button>
+
+            <div class="editor-buttons">
+                <button onclick="saveGame()">Mentés</button>
+                <button class="secondary" onclick="home()">Mégse</button>
+            </div>
+
+        </div>
+    `;
+
+    renderEditorCategories();
 }
 
-input{
-  width:100%;
-  padding:11px;
-  border:1px solid #ccc;
-  border-radius:7px;
-  font-size:16px;
-  margin:5px 0;
+function renderEditorCategories(){
+
+    const container = document.getElementById("editorCategories");
+
+    container.innerHTML = currentGame.categories.map((category,index)=>`
+
+        <div class="editor-category">
+
+            <div class="editor-category-title">
+
+                <input
+                    placeholder="Kategória neve"
+                    value="${escapeAttr(category.name)}"
+                    oninput="
+                        currentGame.categories[${index}].name=this.value
+                    "
+                >
+
+                <button
+                    class="delete"
+                    onclick="deleteCategory(${index})"
+                >×</button>
+
+            </div>
+
+            ${
+                category.traits.map((trait,traitIndex)=>`
+
+                    <div class="editor-trait">
+
+                        <input
+                            placeholder="Jellemző"
+                            value="${escapeAttr(trait)}"
+                            oninput="
+                                currentGame.categories[${index}].traits[${traitIndex}]=this.value
+                            "
+                        >
+
+                        <button
+                            class="delete"
+                            onclick="deleteTrait(${index},${traitIndex})"
+                        >×</button>
+
+                    </div>
+
+                `).join("")
+            }
+
+            <button
+                class="add"
+                onclick="addTrait(${index})"
+            >
+                ＋ Jellemző
+            </button>
+
+        </div>
+
+    `).join("");
 }
 
-.category{
-  border:2px solid #ddd;
-  border-radius:12px;
-  padding:15px;
-  margin:15px 0;
-  background:#fafafa;
+function addCategory(){
+
+    currentGame.categories.push({
+        name:"",
+        traits:[""]
+    });
+
+    renderEditorCategories();
 }
 
-.category h3{
-  margin:0 0 10px;
+function deleteCategory(index){
+
+    currentGame.categories.splice(index,1);
+
+    renderEditorCategories();
 }
 
-.traits-editor{
-  display:flex;
-  flex-direction:column;
-  gap:5px;
+function addTrait(categoryIndex){
+
+    currentGame.categories[categoryIndex].traits.push("");
+
+    renderEditorCategories();
 }
 
-.editor-actions{
-  display:flex;
-  gap:8px;
-  margin-top:10px;
-  flex-wrap:wrap;
+function deleteTrait(categoryIndex,traitIndex){
+
+    currentGame.categories[categoryIndex].traits.splice(traitIndex,1);
+
+    renderEditorCategories();
 }
 
-.games{
-  display:grid;
-  gap:12px;
-}
+function saveGame(){
 
-.game-row{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:10px;
-  background:white;
-  padding:15px;
-  border-radius:10px;
-}
+    currentGame.name =
+        document.getElementById("gameName").value.trim();
 
-.game-buttons{
-  display:flex;
-  gap:6px;
-}
-
-#gameBoard{
-  display:flex;
-  flex-direction:column;
-  gap:15px;
-}
-
-.play-category{
-  background:white;
-  border:3px solid #ddd;
-  border-radius:12px;
-  min-height:180px;
-  padding:12px;
-  width:100%;
-}
-
-.play-category h3{
-  text-align:center;
-  margin-top:0;
-}
-
-.dropzone{
-  min-height:130px;
-  padding:5px;
-}
-
-.traits{
-  display:flex;
-  flex-wrap:wrap;
-  gap:10px;
-  margin-top:25px;
-}
-
-.trait{
-  background:white;
-  border:2px solid #bbb;
-  border-radius:9px;
-  padding:12px 16px;
-  cursor:grab;
-  user-select:none;
-  touch-action:none;
-}
-
-.trait.dragging{
-  opacity:.5;
-}
-
-.trait.correct{
-  background:#b9edc0;
-  border-color:#42a64e;
-}
-
-.trait.wrong{
-  background:#ddd;
-  border-color:#aaa;
-}
-
-.controls{
-  text-align:center;
-  margin:25px 0;
-}
-
-.result{
-  text-align:center;
-  font-size:22px;
-  font-weight:bold;
-  margin:20px;
-}
-
-.solution .dropzone{
-  background:#eef8ee;
-}
-
-@media(max-width:600px){
-
-  #app{
-    padding:12px;
-  }
-
-  header{
-    flex-direction:column;
-    align-items:stretch;
-  }
-
-  .nav{
-    flex-direction:column;
-  }
-
-  .game-row{
-    flex-direction:column;
-    align-items:stretch;
-  }
-
-  .game-buttons{
-    flex-wrap:wrap;
-  }
-}
+    if(!currentGame.name){
+        alert("Adj nevet
